@@ -1,4 +1,5 @@
 ﻿#requires -modules SimplySQL
+Add-Type -AssemblyName System.Web
 
 class DatabaseConnectionProperties{
     # Simple class to control database connection parameters
@@ -45,7 +46,7 @@ class KijijiListing{
     [string]$posted
     [string]$shortdescription
     [datetime]$lastsearched
-    [uri]$searchURL
+    [int]$searchURLID
     [uri]$imageurl
     [int]$discovered
     [byte[]]$image
@@ -61,7 +62,7 @@ class KijijiListing{
 	    description = '(?sm)<div class="description">(.*?)<div class="details">'
     }
 
-    KijijiListing([string]$HTML,[uri]$SearchUrl,[datetime]$Processed){
+    KijijiListing([string]$HTML,[int]$SearchUrlID,[datetime]$Processed){
         # Use the raw html of a listing and parse out the present properties. 
         $this.iD               = if($HTML -match [KijijiListing]::parsingRegexes["id"]){$matches[1]};
         $this.uRL              = if($HTML -match [KijijiListing]::parsingRegexes["url"]){$matches[1]};
@@ -72,7 +73,7 @@ class KijijiListing{
         $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]};
-        $this.searchURL        = $SearchURL
+        $this.searchURLID      = $SearchUrlID
         $this.lastsearched     = $Processed 
         $this.discovered       = 0
     }
@@ -84,12 +85,20 @@ class KijijiListing{
         return ($properties | ForEach-Object{Write-Output ("{0}: {1}" -f $_.PadRight($maxPropertyNameLength, " "),$this.$_)}) -join "`n"
     }
 
-    # Hashtable of parameters designed to be splatted to Invoke-SQLUpdate
-    [hashtable]getSplattableSQLInsert(){
-        return @{
-            Query = "INSERT into listings"
-
+    # Invoke-SQLUpdate to add record to database
+    [object] AddtoDB([string]$ConnectionName){
+        $InvokeSQLUpdateParameters = @{
+            Query = "INSERT INTO listings SET id=@id, url=@url, price=@price, title=@title, distance=@distance, 
+                        location=@location, posted=@posted, shortdescription=@shortdescription, imageurl=@imageurl,searchurlid=@searchurlid,
+                        lastsearched=@lastsearched,discovered=@discovered"
+            Parameters = @{iD = $this.iD; uRL = $this.uRL; price = $this.price; title = $this.title; distance = $this.distance;
+                    location = $this.location; posted = $this.posted; shortDescription = $this.shortDescription; 
+                    imageURL = $this.imageURL; searchURLID = $this.searchURLID; lastsearched = $this.lastsearched;
+                    discovered = $this.discovered;}
+            Connectionn = $ConnectionName
         }
+
+        return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 }
 
@@ -105,7 +114,7 @@ class KijijiSearch{
     $firstListingResultIndex    = 0
     $lastListingResultIndex     = 0 
     $totalNumberOfSearchResults = 0
-    $maximumResultsPerSearch = 0
+    $maximumResultsPerSearch    = 0
     [datetime]$newListingCutoffDate
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
@@ -124,7 +133,7 @@ class KijijiSearch{
             [int]$NewListingThresholdHours,
             [DatabaseConnectionProperties]$ConnectionParameters
         ){
-        # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically stalled
+        # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically halted when browsing Kijiji
         $this._webClient.Encoding = [System.Text.Encoding]::UTF8
         $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
 
@@ -142,7 +151,7 @@ class KijijiSearch{
         # Ensure the search URL is validated and run the search.
         if([KijijiSearch]::ValidateKijijiURL($URL)){
             $this.searchURL = $URL
-            $this.searchURLID = $this.GetSQLSearchURLID($URL)
+            $this.searchURLID = $this.GetSQLSearchURLID()
             $this.maximumResultsPerSearch = $MaximumResults
             $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
@@ -157,16 +166,20 @@ class KijijiSearch{
         return ($properties | ForEach-Object{Write-Output ("{0}: {1}" -f $_.PadRight($maxPropertyNameLength, " "),$this.$_)}) -join "`n"
     }
 
-    [int] GetSQLSearchURLID([uri]$URL){
+    [int]GetSQLSearchURLID(){
+        function Invoke-SQLGetSearchID{
+            return Invoke-SqlScalar "SELECT urlid FROM searchurls WHERE url = @url" -Parameters @{url=$this.searchURL} -ConnectionName $this._databaseConnectionName
+        }
+
         # See if this search url is in the URL table. If not add it.
-        $urlID = Invoke-SqlScalar "SELECT urlid FROM searchurls WHERE url = @url" -Parameters @{url=$URL} -ConnectionName $this._databaseConnectionName
+        $urlID = Invoke-SQLGetSearchID
         if(-not $urlID){
             # This ID is not in the database. Add it.
             try{
                 # Insert the URL record into the database.  
-                Invoke-SqlUpdate "INSERT INTO searchurls (url) VALUES (@url)" -Parameters @{url=$URL} -ConnectionName $this._databaseConnectionName
+                Invoke-SqlUpdate "INSERT INTO searchurls (url) VALUES (@url)" -Parameters @{url=$this.searchURL} -ConnectionName $this._databaseConnectionName
                 # Get the new id
-                $urlID = Invoke-SqlScalar "SELECT urlid FROM searchurls WHERE url = @url" -Parameters @{url=$URL} -ConnectionName $this._databaseConnectionName
+                $urlID = Invoke-SQLGetSearchID
             } catch {Write-Warning ("GetSQLSearchURLID: " + $_[0].Exception.Message)}
         }
 
@@ -192,9 +205,9 @@ class KijijiSearch{
 
         # Parse any listings into class objects
         if($this.totalNumberOfSearchResults -gt 0){
-            $listingHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
-            $listingHTML | ForEach-Object{
-                $this.listings.add([KijijiListing]::new($_,$this.searchURL,$this.SearchExecuted))
+            $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
+            ForEach($singleListingHTML in $listingsHTML){
+                $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
             }
         }
     }
@@ -202,20 +215,16 @@ class KijijiSearch{
     UpdateSQLListings(){
         # Load the currentl listings into the database. New ones will be added outright. If there are conflicts outside a date thresholds then
         # updates to current data may be done.
-        
-        # Listings that will be added to the database as new entries
-        $listingsToAdd  = [System.Collections.ArrayList]::new()
-        # Listings that will be compared to exising entries
-        $listingsToUpdate = [System.Collections.ArrayList]::new() 
 
         # Check each listing to see if it already exists in the database
-        $this.listings | ForEach-Object{
-            $sqlResult = Invoke-SqlQuery "Select id, lastsearched from listings where id = @id" -Parameters @{id=$_.id} -ConnectionName $this._databaseConnectionName
+        foreach($listing in $this.listings){
+            $sqlResult = Invoke-SqlQuery "Select id, lastsearched from listings where id = @id" -Parameters @{id=$listing.id} -ConnectionName $this._databaseConnectionName
             if($sqlResult){
                 # This id historically exists. Check to see if it was found recently.
                 Write-host $sqlResult
             } else {
-                # This ID is not located in the database. 
+                # This ID is not located in the database. Add It
+                $listing.AddtoDB($this._databaseConnectionName)
             }
         }
         
