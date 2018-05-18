@@ -43,13 +43,15 @@ class KijijiListing{
     [string]$title
     [string]$distance
     [string]$location
-    [string]$posted
+    [datetime]$posted
     [string]$shortdescription
     [datetime]$lastsearched
     [int]$searchURLID
     [uri]$imageurl
     [int]$discovered
     [byte[]]$image
+
+    static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
 	    url         = '(?sm)data-vip-url="(.*?)"'
@@ -70,7 +72,9 @@ class KijijiListing{
         $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.distance         = if($HTML -match [KijijiListing]::parsingRegexes["distance"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.location         = if($HTML -match [KijijiListing]::parsingRegexes["location"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
-        $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
+        $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){
+                [KijijiListing]::ConvertFromKijijiDate([System.Web.HttpUtility]::HtmlDecode($matches[1].trim()),$Processed)
+        }
         $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]};
         $this.searchURLID      = $SearchUrlID
@@ -99,6 +103,37 @@ class KijijiListing{
         }
 
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
+    }
+
+    static [datetime] ConvertFromKijijiDate([string]$DateString,[datetime]$BaseDate){
+         # Trim data that does not need to be in the string
+        $DateString = $DateString.Replace("ago","").Replace("<","").Trim()
+
+        # Determine the string format and adjust the current date accordingly from the base date.
+        switch  -Wildcard ($DateString){
+            "*minutes*"  {
+                return $BaseDate.AddMinutes(-($DateString.Replace(" minutes","")))
+                break
+            }
+            "*hours*"    {
+                return $BaseDate.AddHours(-($DateString.Replace(" hours","")))
+                break
+            }
+            "*yesterday*"{
+                # Return yesterday but remove the time
+                return $BaseDate.AddDays(-1).Date
+                break
+            }
+            default{
+                # If none of the other options worked assume this is a normal dd/MM/yyyy string
+                try{
+                    return [DateTime]::ParseExact($DateString, [KijijiListing]::kijijiDateFormat, $null) 
+                } catch {
+                    return $null
+                }
+            }
+        }
+        return $null
     }
 }
 
