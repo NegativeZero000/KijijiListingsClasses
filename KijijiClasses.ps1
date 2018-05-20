@@ -395,23 +395,3 @@ class KijijiSearch{
         return ($url.Host -eq "www.kijiji.ca")
     }
 }
-
-<#
-    Class Testing
-#>
-
-# Import the search alert monitor configs
-$ConfigsPath = "D:\task"
-$searchConfigFile = Get-ChildItem $ConfigsPath -filter "*.cfg.json" | select -First 1
-$searchConfig = $searchConfigFile | Get-Content -raw | ConvertFrom-Json
-
-# Rebuild the credentials from file
-$databaseCredentials = [System.Management.Automation.PSCredential]::new($searchConfig.db.username, ($searchConfig.db.password | ConvertTo-SecureString))
-
-# Initiate the search object
-$connection = [DatabaseConnectionProperties]::new($searchConfig.db.server,$searchConfig.db.port,$searchConfig.db.name,$databaseCredentials)
-$kijijiSearch = [KijijiSearch]::new($searchConfig.searchURLS[0], $searchConfig.searchThreshold, $searchConfig.newListingThreshold, $connection)
-$kijijiSearch.Search()
-$kijijiSearch.UpdateSQLListings()
-$kijijiSearch.Completed()
-
