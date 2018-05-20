@@ -50,6 +50,7 @@ class KijijiListing{
     [uri]$imageurl
     [int]$discovered
     [byte[]]$image
+    [string]$changes
 
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
@@ -82,6 +83,32 @@ class KijijiListing{
         $this.discovered       = 0
     }
 
+    KijijiListing([int]$ID,[string]$ConnectionName){
+        # Populate from an id in the database
+        $selectIDQuery = "SELECT * FROM listings WHERE id=@id LIMIT 1"
+
+        # Query the database
+        try{
+            # The following query will throw an exception if there is no active connection. Capture it as a terminating exception
+            $listingResult = Invoke-SqlQuery -Query $selectIDQuery -Parameters @{id=$ID} -ConnectionName $ConnectionName -Stream -WarningAction Stop 3> Null
+        } catch [System.Management.Automation.ActionPreferenceStopException] {
+            throw [System.NotSupportedException]"No active SQL connection"
+        }
+
+        if($listingResult){
+            # Populate the object from the database data wherever a property match between both is found. 
+            $properties = $this.psobject.properties.name 
+
+            foreach($property in $properties){
+                # If this property is populated in the database row. Do so to this object
+                if($listingResult.$property){$this.$property = $listingResult.$property}
+            }
+        } else {
+            # No match was found in the database. Cannot create the 
+            throw [System.ArgumentException] "No record found for the id "
+        }
+    }
+
     # Simple list like output of non hidden properties. 
     [string]toString(){
         $properties = $this.psobject.properties.name 
@@ -90,15 +117,67 @@ class KijijiListing{
     }
 
     # Invoke-SQLUpdate to add record to database
-    [object] AddtoDB([string]$ConnectionName){
+    [object]AddtoDB([string]$ConnectionName){
         $InvokeSQLUpdateParameters = @{
             Query = "INSERT INTO listings SET id=@id, url=@url, price=@price, title=@title, distance=@distance, 
                         location=@location, posted=@posted, shortdescription=@shortdescription, imageurl=@imageurl,searchurlid=@searchurlid,
-                        lastsearched=@lastsearched,discovered=@discovered"
+                        lastsearched=@lastsearched,discovered=@discovered, new=@new, changes=@changes"
             Parameters = @{iD = $this.iD; uRL = $this.uRL; price = $this.price; title = $this.title; distance = $this.distance;
                     location = $this.location; posted = $this.posted; shortDescription = $this.shortDescription; 
                     imageURL = $this.imageURL; searchURLID = $this.searchURLID; lastsearched = $this.lastsearched;
-                    discovered = $this.discovered;}
+                    discovered = $this.discovered; new = 1; changes=""}
+            Connectionn = $ConnectionName
+        }
+
+        return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
+    }
+
+    CompareListing([KijijiListing]$DifferenceListing){
+        # Using the differencelisting show all properties that are different. Return a list of properties and their differences
+        $differentProperties = [System.Collections.ArrayList]::new()
+
+        # Populate the object from the database data.
+        $properties = $this.psobject.properties.name 
+
+        foreach($property in $properties){
+            # If this property is populated in the database row. Do so to this object
+            if($DifferenceListing.$property -ne $this.$property){
+                # Some properties have special rules for determining difference
+                $findings = "Property has changed"
+                switch($property){
+                    "price"{
+                        # If both prices are numbers then compare. Else give default reason
+                        if($this.price -as [double] -and $DifferenceListing.price -as [double]){
+                            if([double]$this.price -lt [double]$DifferenceListing.price){
+                                $findings = "Price has increased"
+                            } else {
+                                $findings = "Price has decreased"
+                            }
+                        }
+                    }
+                }
+
+                # Add this property and its notes to the list to be returned. 
+                $differentProperties.Add([pscustomobject]@{Property=$property;Findings=$findings})
+            }
+        }
+
+        # Add the finding back to the $this.changes in json form.
+        $this.changes = $differentProperties | ConvertTo-Json -Depth 2
+    }
+
+    # Make changes to an existing listing in a database
+    [object]UpdateInDB([string]$ConnectionName,[int]$Discovered){
+        $InvokeSQLUpdateParameters = @{
+            Query = "UPDATE listings SET url=@url, price=@price, title=@title, distance=@distance, 
+                        location=@location, posted=@posted, shortdescription=@shortdescription, imageurl=@imageurl,searchurlid=@searchurlid,
+                        lastsearched=@lastsearched,discovered=@discovered, new=@new, changes=@changes
+                     WHERE id=@id"
+            # Add all properties using ones in current object. If we are doing an update increase the 
+            Parameters = @{id = $this.iD; uRL = $this.uRL; price = $this.price; title = $this.title; distance = $this.distance;
+                    location = $this.location; posted = $this.posted; shortDescription = $this.shortDescription; 
+                    imageURL = $this.imageURL; searchURLID = $this.searchURLID; lastsearched = $this.lastsearched;
+                    discovered = $Discovered + 1; new = 1; changes=$this.changes}
             Connectionn = $ConnectionName
         }
 
@@ -223,7 +302,7 @@ class KijijiSearch{
 
     # Instance Methods
     Search(){
-        # Performs a kijiji web search
+        # Performs a kijiji web search. All found listings are added to an arraylist property for evaluation.
 
         # Set the search execution time to now
         $this.SearchExecuted = Get-Date
@@ -250,19 +329,39 @@ class KijijiSearch{
     UpdateSQLListings(){
         # Load the currentl listings into the database. New ones will be added outright. If there are conflicts outside a date thresholds then
         # updates to current data may be done.
-
-        # Check each listing to see if it already exists in the database
+        $duplicateListing = $null
+        
         foreach($listing in $this.listings){
-            $sqlResult = Invoke-SqlQuery "Select id, lastsearched from listings where id = @id" -Parameters @{id=$listing.id} -ConnectionName $this._databaseConnectionName
-            if($sqlResult){
+            # Check each listing to see if it already exists in the database
+            try{
+                $duplicateListing = [KijijiListing]::new($listing.id,$this._databaseConnectionName)       
+            } catch [System.NotSupportedException] {
+                # Could not connect to SQL database using named connection
+                throw $_
+            } catch [System.ArgumentException] {
+                # No matching listing was found. Continue
+            } catch {
+                # Rethrow this exception.
+                throw $_
+            }
+
+            # If a duplicate listing is found we will need to update it appropriately else
+            # just add this listing as a new listing.
+            if($duplicateListing){
                 # This id historically exists. Check to see if it was found recently.
-                Write-host $sqlResult
+                if($duplicateListing.lastsearched -lt $this.newListingCutoffDate){
+                    # Record the difference between this one and the duplicate listing
+                    $listing.CompareListing($duplicateListing)
+                    # Update the listing in the DB with new information
+                    $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
+                } else {
+                    # This listing is too recent to be considered rediscovered. Ignore it.
+                }
             } else {
                 # This ID is not located in the database. Add It
                 $listing.AddtoDB($this._databaseConnectionName)
             }
         }
-        
     }
 
     Completed(){
@@ -312,8 +411,7 @@ $databaseCredentials = [System.Management.Automation.PSCredential]::new($searchC
 # Initiate the search object
 $connection = [DatabaseConnectionProperties]::new($searchConfig.db.server,$searchConfig.db.port,$searchConfig.db.name,$databaseCredentials)
 $kijijiSearch = [KijijiSearch]::new($searchConfig.searchURLS[0], $searchConfig.searchThreshold, $searchConfig.newListingThreshold, $connection)
-
 $kijijiSearch.Search()
 $kijijiSearch.UpdateSQLListings()
-
 $kijijiSearch.Completed()
+
