@@ -52,6 +52,7 @@ class KijijiListing{
     [byte[]]$image
     [string]$changes
 
+    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
@@ -137,7 +138,7 @@ class KijijiListing{
         $differentProperties = [System.Collections.ArrayList]::new()
 
         # Populate the object from the database data.
-        $properties = $this.psobject.properties.name 
+        $properties = $this.psobject.properties.name.where({$_ -notin [kijijilisting]::ComparePropertiesToIgnore})
 
         foreach($property in $properties){
             # If this property is populated in the database row. Do so to this object
@@ -149,9 +150,9 @@ class KijijiListing{
                         # If both prices are numbers then compare. Else give default reason
                         if($this.price -as [double] -and $DifferenceListing.price -as [double]){
                             if([double]$this.price -lt [double]$DifferenceListing.price){
-                                $findings = "Price has increased"
-                            } else {
                                 $findings = "Price has decreased"
+                            } else {
+                                $findings = "Price has increased"
                             }
                         }
                     }
@@ -164,6 +165,7 @@ class KijijiListing{
 
         # Add the finding back to the $this.changes in json form.
         $this.changes = $differentProperties | ConvertTo-Json -Depth 2
+        Write-Host $this.changes 
     }
 
     # Make changes to an existing listing in a database
