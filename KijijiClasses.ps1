@@ -165,7 +165,6 @@ class KijijiListing{
 
         # Add the finding back to the $this.changes in json form.
         $this.changes = $differentProperties | ConvertTo-Json -Depth 2
-        Write-Host $this.changes 
     }
 
     # Make changes to an existing listing in a database
