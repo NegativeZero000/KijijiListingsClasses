@@ -91,6 +91,7 @@ class KijijiListing{
         # Query the database
         try{
             # The following query will throw an exception if there is no active connection. Capture it as a terminating exception
+            Write-Verbose "Checking for existing listing with id: $ID"
             $listingResult = Invoke-SqlQuery -Query $selectIDQuery -Parameters @{id=$ID} -ConnectionName $ConnectionName -Stream -WarningAction Stop 3> Null
         } catch [System.Management.Automation.ActionPreferenceStopException] {
             throw [System.NotSupportedException]"No active SQL connection"
@@ -106,7 +107,7 @@ class KijijiListing{
             }
         } else {
             # No match was found in the database. Cannot create the 
-            throw [System.ArgumentException] "No record found for the id "
+            throw [System.ArgumentException] "No record found for the id: $ID"
         }
     }
 
