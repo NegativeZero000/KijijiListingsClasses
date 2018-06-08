@@ -52,7 +52,7 @@ class KijijiListing{
     [byte[]]$image
     [string]$changes
 
-    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered"
+    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
@@ -164,7 +164,7 @@ class KijijiListing{
         }
 
         # Add the finding back to the $this.changes in json form.
-        $this.changes = $differentProperties | ConvertTo-Json -Depth 2
+        $this.changes = @($differentProperties) | ConvertTo-Json -Depth 2
     }
 
     # Make changes to an existing listing in a database
@@ -355,8 +355,10 @@ class KijijiSearch{
                     $listing.CompareListing($duplicateListing)
                     # Update the listing in the DB with new information
                     $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
+                    Write-Verbose "Updated existing listing $($duplicateListing.id) with new data"
                 } else {
                     # This listing is too recent to be considered rediscovered. Ignore it.
+                    Write-Verbose "Listing $($listing.id) found in database before the cutoff date: $($this.newListingCutoffDate)"
                 }
             } else {
                 # This ID is not located in the database. Add It
