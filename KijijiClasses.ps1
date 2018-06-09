@@ -165,7 +165,9 @@ class KijijiListing{
         }
 
         # Add the finding back to the $this.changes in json form.
-        $this.changes = ConvertTo-Json -Depth 2 -InputObject @($differentProperties)
+        if($differentProperties.Count -gt 0){
+            $this.changes = ConvertTo-Json -Depth 2 -InputObject @($differentProperties)
+        }
     }
 
     # Make changes to an existing listing in a database
