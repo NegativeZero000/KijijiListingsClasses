@@ -32,6 +32,5 @@ foreach($searchConfigFile in $searchConfigFiles){
     }
 }
 
-
 # Reset verbosity preference
 $VerbosePreference = $previousVerbosePreference

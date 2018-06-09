@@ -52,7 +52,7 @@ class KijijiListing{
     [byte[]]$image
     [string]$changes
 
-    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID"
+    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
@@ -165,7 +165,7 @@ class KijijiListing{
         }
 
         # Add the finding back to the $this.changes in json form.
-        $this.changes = @($differentProperties) | ConvertTo-Json -Depth 2
+        $this.changes = ConvertTo-Json -Depth 2 -InputObject @($differentProperties)
     }
 
     # Make changes to an existing listing in a database
