@@ -274,17 +274,18 @@ class KijijiSearch{
         }
 
         # Ensure the search URL is validated and run the search.
-        if([KijijiSearch]::ValidateKijijiURL($URL)){
+        if([KijijiSearch]::ValidKijijiURL($URL)){
             $this.searchURL = $URL
             $this.searchURLID = $this.GetSQLSearchURLID()
             $this.maximumResultsPerSearch = $MaximumResults
             $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
+        } else {
+            throw [System.ArgumentException]"Failed kijiji url validation"
         }
 
         Write-Verbose $this.toString()
     }
-
 
     # Simple list like output of non hidden properties. 
     [string]toString(){
@@ -321,6 +322,7 @@ class KijijiSearch{
         $this.SearchExecuted = Get-Date
 
         # Run the search and parse the page.
+        Write-Verbose "Performing search against $($this.searchURL)"
         $rawHTML = $this._webClient.DownloadString($this.searchURL)
 
         # Get search meta data from the first page of the search.
@@ -332,10 +334,13 @@ class KijijiSearch{
 
         # Parse any listings into class objects
         if($this.totalNumberOfSearchResults -gt 0){
+            Write-Verbose "Found $($this.totalNumberOfSearchResults) listing(s)"
             $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
             ForEach($singleListingHTML in $listingsHTML){
                 $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
             }
+        } else {
+            Write-Verbose "No listing found"
         }
     }
 
@@ -405,7 +410,7 @@ class KijijiSearch{
     }
 
     # Static Methods
-    [boolean] static ValidateKijijiURL([uri]$URL){
+    [boolean] static ValidKijijiURL([uri]$URL){
         # Ensure that the URL is well formed kijiji url
         return ($url.Host -eq "www.kijiji.ca")
     }
