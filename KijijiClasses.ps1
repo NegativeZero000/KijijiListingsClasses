@@ -88,10 +88,12 @@ class KijijiListing{
         # Populate from an id in the database
         $selectIDQuery = "SELECT * FROM listings WHERE id=@id LIMIT 1"
 
+        Write-Verbose "$ID`: initiating listing object with id"
+
         # Query the database
         try{
             # The following query will throw an exception if there is no active connection. Capture it as a terminating exception
-            Write-Verbose "Checking for existing listing with id: $ID"
+            Write-Verbose "$ID`: check for existing listing"
             $listingResult = Invoke-SqlQuery -Query $selectIDQuery -Parameters @{id=$ID} -ConnectionName $ConnectionName -Stream -WarningAction Stop 3> Null
         } catch [System.Management.Automation.ActionPreferenceStopException] {
             throw [System.NotSupportedException]"No active SQL connection"
@@ -99,6 +101,7 @@ class KijijiListing{
 
         if($listingResult){
             # Populate the object from the database data wherever a property match between both is found. 
+            Write-Verbose "$ID`: match found in database"
             $properties = $this.psobject.properties.name 
 
             foreach($property in $properties){
@@ -130,7 +133,7 @@ class KijijiListing{
                     discovered = $this.discovered; new = 1; changes=""}
             Connectionn = $ConnectionName
         }
-
+        Write-Verbose "$($this.id): insert into database"
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 
@@ -140,6 +143,7 @@ class KijijiListing{
 
         # Populate the object from the database data.
         $properties = $this.psobject.properties.name.where({$_ -notin [kijijilisting]::ComparePropertiesToIgnore})
+        Write-Verbose "$($this.id): comparing against $($differentProperties.id)"
 
         foreach($property in $properties){
             # If this property is populated in the database row. Do so to this object
@@ -165,7 +169,9 @@ class KijijiListing{
         }
 
         # Add the finding back to the $this.changes in json form.
+        Write-Verbose "$($this.id): compare results: $($differentProperties.Count) differences"
         if($differentProperties.Count -gt 0){
+            Write-Verbose "$($this.id): updating changes"
             $this.changes = ConvertTo-Json -Depth 2 -InputObject @($differentProperties)
         }
     }
@@ -185,6 +191,7 @@ class KijijiListing{
             Connectionn = $ConnectionName
         }
 
+        Write-Verbose "$($this.id): updating in database"
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 
@@ -274,6 +281,8 @@ class KijijiSearch{
             $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
         }
+
+        Write-Verbose $this.toString()
     }
 
 
