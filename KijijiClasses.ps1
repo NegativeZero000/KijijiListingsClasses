@@ -88,12 +88,12 @@ class KijijiListing{
         # Populate from an id in the database
         $selectIDQuery = "SELECT * FROM listings WHERE id=@id LIMIT 1"
 
-        Write-Verbose "$ID`: initiating listing object with id"
+        Write-Verbose "KijijiListing - $ID`: initiating listing object with id"
 
         # Query the database
         if(Test-SqlConnection -ConnectionName $ConnectionName){
             # The following query will throw an exception if there is no active connection. Capture it as a terminating exception
-            Write-Verbose "$ID`: check for existing listing"
+            Write-Verbose "KijijiListing - $ID`: check for existing listing"
             $listingResult = Invoke-SqlQuery -Query $selectIDQuery -Parameters @{id=$ID} -ConnectionName $ConnectionName -Stream
         } else {
             throw [System.NotSupportedException]"No active SQL connection"
@@ -101,7 +101,7 @@ class KijijiListing{
 
         if($listingResult){
             # Populate the object from the database data wherever a property match between both is found. 
-            Write-Verbose "$ID`: match found in database"
+            Write-Verbose "KijijiListing - $ID`: match found in database"
             $properties = $this.psobject.properties.name 
 
             foreach($property in $properties){
@@ -133,7 +133,7 @@ class KijijiListing{
                     discovered = $this.discovered; new = 1; changes=""}
             Connectionn = $ConnectionName
         }
-        Write-Verbose "$($this.id): insert into database"
+        Write-Verbose "AddtoDB - $($this.id): insert into database"
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 
@@ -143,7 +143,7 @@ class KijijiListing{
 
         # Populate the object from the database data.
         $properties = $this.psobject.properties.name.where({$_ -notin [kijijilisting]::ComparePropertiesToIgnore})
-        Write-Verbose "$($this.id): comparing against $($differentProperties.id)"
+        Write-Verbose "CompareListing - $($this.id): comparing against $($differentProperties.id)"
 
         foreach($property in $properties){
             # If this property is populated in the database row. Do so to this object
@@ -169,9 +169,9 @@ class KijijiListing{
         }
 
         # Add the finding back to the $this.changes in json form.
-        Write-Verbose "$($this.id): compare results: $($differentProperties.Count) differences"
+        Write-Verbose "CompareListing - $($this.id): compare results: $($differentProperties.Count) differences"
         if($differentProperties.Count -gt 0){
-            Write-Verbose "$($this.id): updating changes"
+            Write-Verbose "CompareListing - $($this.id): updating changes"
             $this.changes = ConvertTo-Json -Depth 2 -InputObject @($differentProperties)
         }
     }
@@ -284,7 +284,7 @@ class KijijiSearch{
             throw [System.ArgumentException]"Failed kijiji url validation"
         }
 
-        Write-Verbose $this.toString()
+        Write-Verbose "KijijiSearch - $($this.toString())"
     }
 
     # Simple list like output of non hidden properties. 
@@ -322,7 +322,7 @@ class KijijiSearch{
         $this.SearchExecuted = Get-Date
 
         # Run the search and parse the page.
-        Write-Verbose "Performing search against $($this.searchURL)"
+        Write-Verbose "Search - Performing search against $($this.searchURL)"
         $rawHTML = $this._webClient.DownloadString($this.searchURL)
 
         # Get search meta data from the first page of the search.
@@ -334,24 +334,26 @@ class KijijiSearch{
 
         # Parse any listings into class objects
         if($this.totalNumberOfSearchResults -gt 0){
-            Write-Verbose "Found $($this.totalNumberOfSearchResults) listing(s)"
+            Write-Verbose "Search - Found $($this.totalNumberOfSearchResults) listing(s)"
             $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
             ForEach($singleListingHTML in $listingsHTML){
                 $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
             }
         } else {
-            Write-Verbose "No listing found"
+            Write-Verbose "Search - No listing found"
         }
     }
 
     UpdateSQLListings(){
         # Load the currentl listings into the database. New ones will be added outright. If there are conflicts outside a date thresholds then
         # updates to current data may be done.
-        $duplicateListing = $null
         
         foreach($listing in $this.listings){
             # Check each listing to see if it already exists in the database
+            $duplicateListing = $null
+
             try{
+                Write-Verbose "UpdateSQLListings - $($listing.id) duplicate search"
                 $duplicateListing = [KijijiListing]::new($listing.id,$this._databaseConnectionName)       
             } catch [System.NotSupportedException] {
                 # Could not connect to SQL database using named connection
@@ -372,10 +374,10 @@ class KijijiSearch{
                     $listing.CompareListing($duplicateListing)
                     # Update the listing in the DB with new information
                     $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
-                    Write-Verbose "Updated existing listing $($duplicateListing.id) with new data"
+                    Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with new data"
                 } else {
                     # This listing is too recent to be considered rediscovered. Ignore it.
-                    Write-Verbose "Listing $($listing.id) found in database before the cutoff date: $($this.newListingCutoffDate)"
+                    Write-Verbose "UpdateSQLListings - Listing $($listing.id) found in database before the cutoff date: $($this.newListingCutoffDate)"
                 }
             } else {
                 # This ID is not located in the database. Add It
@@ -386,7 +388,10 @@ class KijijiSearch{
 
     Completed(){
         # Called to finilize search. Currently just close database connection
-        if(Get-SqlConnection -ConnectionName $this._databaseConnectionName){Close-SqlConnection -ConnectionName $this._databaseConnectionName}
+        if(Get-SqlConnection -ConnectionName $this._databaseConnectionName){
+            Write-Verbose "Completed - closing connection $($this._databaseConnectionName)"
+            Close-SqlConnection -ConnectionName $this._databaseConnectionName
+        }
     }
 
     hidden static [uri]_AddPageNumber([uri]$url){
