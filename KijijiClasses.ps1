@@ -241,6 +241,7 @@ class KijijiSearch{
     $totalNumberOfSearchResults = 0
     $maximumResultsPerSearch    = 0
     [datetime]$newListingCutoffDate
+    [bool]$flagOnlyChanges = $false
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
         # Current listing index as well as total results. Helps determine number of pages.
@@ -254,8 +255,9 @@ class KijijiSearch{
             # Kijiji Search URL
             [uri]$URL,
             [int]$MaximumResults,
-            # Database connection parameters
             [int]$NewListingThresholdHours,
+            [bool]$OnlyFlagChanges,
+            # Database connection parameters
             [DatabaseConnectionProperties]$ConnectionParameters
         ){
         # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically halted when browsing Kijiji
@@ -280,6 +282,7 @@ class KijijiSearch{
             $this.maximumResultsPerSearch = $MaximumResults
             $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
+            $this.flagOnlyChanges = $OnlyFlagChanges
         } else {
             throw [System.ArgumentException]"Failed kijiji url validation"
         }
@@ -372,9 +375,19 @@ class KijijiSearch{
                 if($duplicateListing.lastsearched -lt $this.newListingCutoffDate){
                     # Record the difference between this one and the duplicate listing
                     $listing.CompareListing($duplicateListing)
-                    # Update the listing in the DB with new information
-                    $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
-                    Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with new data"
+
+                    # Detect if we are only looking for changes before updating
+                    if($this.flagOnlyChanges -and ![string]::IsNullOrEmpty($duplicateListing.changes)){
+                        # Update the listings chagnes and discovered value then flag as new
+                        $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
+                        Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with detected changes"
+                    } elseif(-not $this.flagOnlyChanges) {
+                        # Update the listings discovered value and flag as new
+                        $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
+                        Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with new discovery data"
+                    } else {
+                        Write-Verbose "UpdateSQLListings - Listing $($duplicateListing.id) was found but with no changes from previous discovery. No update done."
+                    }
                 } else {
                     # This listing is too recent to be considered rediscovered. Ignore it.
                     Write-Verbose "UpdateSQLListings - Listing $($listing.id) found in database before the cutoff date: $($this.newListingCutoffDate)"

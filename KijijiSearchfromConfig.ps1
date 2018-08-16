@@ -22,7 +22,7 @@ foreach($searchConfigFile in $searchConfigFiles){
     # Loop the searches in this file
     for($searchIndex = 0; $searchIndex -lt $searchConfig.searchURLS.Count; $searchIndex++){
         # Build the search object
-        $kijijiSearch = [KijijiSearch]::new($searchConfig.searchURLS[$searchIndex], $searchConfig.searchThreshold, $searchConfig.newListingThreshold, $connection)
+        $kijijiSearch = [KijijiSearch]::new($searchConfig.searchURLS[$searchIndex], $searchConfig.searchThreshold, $searchConfig.newListingThreshold, $searchConfig.flagOnlyChanges, $connection)
         # Start the search based on config options
         $kijijiSearch.Search()
         # Load any new listings and update existing ones where applicable
