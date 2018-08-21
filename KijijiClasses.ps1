@@ -52,7 +52,7 @@ class KijijiListing{
     [byte[]]$image
     [string]$changes
 
-    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
+    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes","url"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
