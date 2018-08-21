@@ -377,7 +377,7 @@ class KijijiSearch{
                     $listing.CompareListing($duplicateListing)
 
                     # Detect if we are only looking for changes before updating
-                    if($this.flagOnlyChanges -and ![string]::IsNullOrEmpty($duplicateListing.changes)){
+                    if($this.flagOnlyChanges -and $listing.changes){
                         # Update the listings chagnes and discovered value then flag as new
                         $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
                         Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with detected changes"
