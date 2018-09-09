@@ -65,6 +65,7 @@ class KijijiListing{
 	    location    = '(?sm)<div class="location">(.*?)<span'
 	    postedTime  = '<span class="date-posted">(.*?)</span>'
 	    description = '(?sm)<div class="description">(.*?)<div class="details">'
+        page        = 'page\-(?<pagenumber>\d+)'
     }
 
     KijijiListing([string]$HTML,[int]$SearchUrlID,[datetime]$Processed){
@@ -419,9 +420,8 @@ class KijijiSearch{
     hidden static [uri]_AddPageNumber([uri]$url){
         # Deep Kijiji searches are done using page numbers. The first page of the search typically does not have one. 
         # Add a page number if this url does not have one. 
-        $pageSegmentRegex = "page\-\d+"
 
-        if( $url.Segments -match $pageSegmentRegex){
+        if($url.Segments -match [KijijiListing]::parsingRegexes["page"]){
             # This url has a page number amongst its segments. Return as is
             return $url
         } else {
@@ -434,6 +434,29 @@ class KijijiSearch{
                     $URL.Query)
                 ).Uri.AbsoluteUri -as [uri]   
         }
+    }
+
+    hidden static [uri]_IncreasePageNumber([uri]$url){
+        # Deep Kijiji searches are done using page numbers. Increase the page number of the offered url
+
+        # Enusre this already has a page number before proceeding
+        $URL = [KijijiSearch]::_AddPageNumber($url) 
+
+        return ([System.UriBuilder]::new(
+            $URL.Scheme,
+            $URL.Host,
+            $URL.port, 
+            -join @(        
+                # Isolate the page number and increase by one
+                $url.Segments | ForEach-Object{
+                    if($_ -match 'page\-(?<pagenumber>\d+)'){
+                        "page-$(($Matches.pagenumber -as [int]) + 1)"
+                    } else {
+                        $_
+                    }
+                }),
+            $URL.Query)
+        ).Uri.AbsoluteUri -as [uri]   
     }
 
     # Static Methods
