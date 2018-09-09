@@ -65,7 +65,6 @@ class KijijiListing{
 	    location    = '(?sm)<div class="location">(.*?)<span'
 	    postedTime  = '<span class="date-posted">(.*?)</span>'
 	    description = '(?sm)<div class="description">(.*?)<div class="details">'
-        page        = 'page\-(?<pagenumber>\d+)'
     }
 
     KijijiListing([string]$HTML,[int]$SearchUrlID,[datetime]$Processed){
@@ -250,7 +249,9 @@ class KijijiSearch{
         # Current listing index as well as total results. Helps determine number of pages.
         TotalListingNumbers = '(?sm)<div class="showing">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) Ads</div>'
         # Determine unique listing html blocks
-        Listing = '(?sm)data-ad-id="\w+".*?<div class="details">'
+        Listing             = '(?sm)data-ad-id="\w+".*?<div class="details">'
+        # Get the page number out of a uri segment
+        page                = 'page\-(?<pagenumber>\d+)'
     }
     
     # Contructors
@@ -258,8 +259,8 @@ class KijijiSearch{
             # Kijiji Search URL
             [uri]$URL,
             [int]$MaximumResults,
-            [int]$NewListingThresholdHours,
-            [int]$OldListingThresholdHours,
+            [int]$NewListingThresholdHours=36,
+            [int]$OldListingThresholdHours=1080,
             [bool]$OnlyFlagChanges,
             # Database connection parameters
             [DatabaseConnectionProperties]$ConnectionParameters
@@ -352,7 +353,7 @@ class KijijiSearch{
 
                 # Increase the page count for the next search, if any
                 if ($this.lastListingResultIndex -lt $this.totalNumberOfSearchResults){
-                    $this.searchURL = [kijijilisting]::_IncreasePageNumber($this.searchURL)
+                    $this.searchURL = [KijijiSearch]::_IncreasePageNumber($this.searchURL)
                 }
             } else {
                 Write-Verbose "Search - No listing found"
@@ -389,6 +390,7 @@ class KijijiSearch{
 
                 if($duplicateListing.lastsearched -lt $this.oldListingCutoffDate){
                     # Listing is past the oldListingCutoffDate and should be flagged as rediscovered
+                    $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
                     Write-Verbose "UpdateSQLListings - Duplicate listing is past oldListingCutoffDate"
 
                 } elseif($duplicateListing.lastsearched -le $this.newListingCutoffDate -and $duplicateListing.lastsearched -ge $this.oldListingCutoffDate ){
@@ -429,7 +431,7 @@ class KijijiSearch{
         # Deep Kijiji searches are done using page numbers. The first page of the search typically does not have one. 
         # Add a page number if this url does not have one. 
 
-        if($url.Segments -match [KijijiListing]::parsingRegexes["page"]){
+        if($url.Segments -match [KijijiSearch]::parsingRegexes["page"]){
             # This url has a page number amongst its segments. Return as is
             return $url
         } else {
@@ -457,12 +459,13 @@ class KijijiSearch{
             -join @(        
                 # Isolate the page number and increase by one
                 $url.Segments | ForEach-Object{
-                    if($_ -match 'page\-(?<pagenumber>\d+)'){
-                        "page-$(($Matches.pagenumber -as [int]) + 1)"
+                    if($_ -match [KijijiSearch]::parsingRegexes["page"]){
+                        "page-$(($Matches.pagenumber -as [int]) + 1)/"
                     } else {
                         $_
                     }
-                }),
+                }
+            ),
             $URL.Query)
         ).Uri.AbsoluteUri -as [uri]   
     }
