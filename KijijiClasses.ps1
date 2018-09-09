@@ -329,27 +329,35 @@ class KijijiSearch{
         # Set the search execution time to now
         $this.SearchExecuted = Get-Date
 
-        # Run the search and parse the page.
-        Write-Verbose "Search - Performing search against $($this.searchURL)"
-        $rawHTML = $this._webClient.DownloadString($this.searchURL)
+        # Search until enough results to satisfy maximumResultsPerSearch or none
+        do{    
+            # Run the search and parse the page.
+            Write-Verbose "Search - Performing search against $($this.searchURL)"
+            $rawHTML = $this._webClient.DownloadString($this.searchURL)
 
-        # Get search meta data from the first page of the search.
-        if($rawHTML -match [KijijiSearch]::parsingRegexes["TotalListingNumbers"]){
-            $this.firstListingResultIndex    = $Matches["FirstListingResultIndex"] -as [int]
-            $this.lastListingResultIndex     = $Matches["LastListingResultIndex"] -as [int]
-            $this.totalNumberOfSearchResults = $Matches["TotalNumberOfSearchResults"] -as [int]
-        }
-
-        # Parse any listings into class objects
-        if($this.totalNumberOfSearchResults -gt 0){
-            Write-Verbose "Search - Found $($this.totalNumberOfSearchResults) listing(s)"
-            $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
-            ForEach($singleListingHTML in $listingsHTML){
-                $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
+            # Get search meta data from the first page of the search.
+            if($rawHTML -match [KijijiSearch]::parsingRegexes["TotalListingNumbers"]){
+                $this.firstListingResultIndex    = $Matches["FirstListingResultIndex"] -as [int]
+                $this.lastListingResultIndex     = $Matches["LastListingResultIndex"] -as [int]
+                $this.totalNumberOfSearchResults = $Matches["TotalNumberOfSearchResults"] -as [int]
             }
-        } else {
-            Write-Verbose "Search - No listing found"
-        }
+
+            # Parse any listings into class objects
+            if($this.totalNumberOfSearchResults -gt 0){
+                Write-Verbose "Search - Found $($this.totalNumberOfSearchResults) listing(s)"
+                $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
+                ForEach($singleListingHTML in $listingsHTML){
+                    $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
+                }
+
+                # Increase the page count for the next search, if any
+                if ($this.lastListingResultIndex -lt $this.totalNumberOfSearchResults){
+                    $this.searchURL = [kijijilisting]::_IncreasePageNumber($this.searchURL)
+                }
+            } else {
+                Write-Verbose "Search - No listing found"
+            }
+        } until ($this.listings.count -ge $this.maximumResultsPerSearch -or $this.totalNumberOfSearchResults -eq 0)
     }
 
     UpdateSQLListings(){
