@@ -1,4 +1,5 @@
 ﻿#requires -modules SimplySQL
+# D:\task\kijijiDB\KijijiSearchfromConfig.ps1 -ConfigPath D:\task\kijijiDB\search.cfg.json -Verbose
 Add-Type -AssemblyName System.Web
 
 class DatabaseConnectionProperties{
@@ -52,7 +53,7 @@ class KijijiListing{
     [byte[]]$image
     [string]$changes
 
-    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes","url"
+    static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
         id          = '(?sm)data-ad-id="(\w+)"'
@@ -241,6 +242,7 @@ class KijijiSearch{
     $totalNumberOfSearchResults = 0
     $maximumResultsPerSearch    = 0
     [datetime]$newListingCutoffDate
+    [datetime]$oldListingCutoffDate
     [bool]$flagOnlyChanges = $false
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
@@ -256,6 +258,7 @@ class KijijiSearch{
             [uri]$URL,
             [int]$MaximumResults,
             [int]$NewListingThresholdHours,
+            [int]$OldListingThresholdHours,
             [bool]$OnlyFlagChanges,
             # Database connection parameters
             [DatabaseConnectionProperties]$ConnectionParameters
@@ -282,6 +285,7 @@ class KijijiSearch{
             $this.maximumResultsPerSearch = $MaximumResults
             $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
+            $this.oldListingCutoffDate = (Get-Date).AddHours(-$OldListingThresholdHours)
             $this.flagOnlyChanges = $OnlyFlagChanges
         } else {
             throw [System.ArgumentException]"Failed kijiji url validation"
@@ -372,25 +376,30 @@ class KijijiSearch{
             # just add this listing as a new listing.
             if($duplicateListing){
                 # This id historically exists. Check to see if it was found recently.
-                if($duplicateListing.lastsearched -lt $this.newListingCutoffDate){
-                    # Record the difference between this one and the duplicate listing
-                    $listing.CompareListing($duplicateListing)
+                Write-Verbose "UpdateSQLListings - Checking dupe listing date: $($duplicateListing.lastsearched)"
 
-                    # Detect if we are only looking for changes before updating
-                    if($this.flagOnlyChanges -and $listing.changes){
-                        # Update the listings chagnes and discovered value then flag as new
-                        $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
-                        Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with detected changes"
-                    } elseif(-not $this.flagOnlyChanges) {
-                        # Update the listings discovered value and flag as new
+                if($duplicateListing.lastsearched -lt $this.oldListingCutoffDate){
+                    # Listing is past the oldListingCutoffDate and should be flagged as rediscovered
+                    Write-Verbose "UpdateSQLListings - Duplicate listing is past oldListingCutoffDate"
+
+                } elseif($duplicateListing.lastsearched -le $this.newListingCutoffDate -and $duplicateListing.lastsearched -ge $this.oldListingCutoffDate ){
+                    # Listing is past the newListingCutoffDate but before the oldListingCutoffDate
+                    Write-Verbose "UpdateSQLListings - Duplicate listing is between newListingCutoffDate and oldListingCutoffDate"
+
+                    if($listing.changes){
+                        # Changes were detected. Update the database
                         $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
                         Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with new discovery data"
                     } else {
-                        Write-Verbose "UpdateSQLListings - Listing $($duplicateListing.id) was found but with no changes from previous discovery. No update done."
+                        # No detected changes. Update if flag is off.
+                        if(-not $this.flagOnlyChanges){
+                            $listing.UpdateInDB($this._databaseConnectionName, $duplicateListing.discovered)
+                            Write-Verbose "UpdateSQLListings - Updated existing listing $($duplicateListing.id) with new discovery data"
+                        }
                     }
                 } else {
                     # This listing is too recent to be considered rediscovered. Ignore it.
-                    Write-Verbose "UpdateSQLListings - Listing $($listing.id) found in database before the cutoff date: $($this.newListingCutoffDate)"
+                    Write-Verbose "UpdateSQLListings - Listing $($listing.id) found in database before the newListingCutoffDate. No changes made"
                 }
             } else {
                 # This ID is not located in the database. Add It
