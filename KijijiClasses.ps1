@@ -296,6 +296,28 @@ class KijijiSearch{
         Write-Verbose "KijijiSearch - $($this.toString())"
     }
 
+    KijijiSearch(
+            # Kijiji Search URL
+            [uri]$URL,
+            [int]$MaximumResults
+        ){
+        # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically halted when browsing Kijiji
+        $this._webClient.Encoding = [System.Text.Encoding]::UTF8
+        $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
+
+        # Ensure the search URL is validated and run the search.
+        if([KijijiSearch]::ValidKijijiURL($URL)){
+            $this.searchURL = $URL
+            $this.searchURLID = $this.GetSQLSearchURLID()
+            $this.maximumResultsPerSearch = $MaximumResults
+            $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
+        } else {
+            throw [System.ArgumentException]"Failed kijiji url validation"
+        }
+
+        Write-Verbose "KijijiSearch - $($this.toString())"
+    }
+
     # Simple list like output of non hidden properties. 
     [string]toString(){
         $properties = $this.psobject.properties.name 
