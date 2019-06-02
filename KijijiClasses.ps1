@@ -56,7 +56,7 @@ class KijijiListing{
     static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static $parsingRegexes = @{
-        id          = '(?sm)data-ad-id="(\w+)"'
+        id          = '(?sm)data-listing-id="(\w+)"'
 	    url         = '(?sm)data-vip-url="(.*?)"'
 	    price       = '(?sm)<div class="price">(.*?)</div>'
         image       = '(?sm)<div class="image">.*?<img src="(.*?)"'
@@ -249,7 +249,7 @@ class KijijiSearch{
         # Current listing index as well as total results. Helps determine number of pages.
         TotalListingNumbers = '(?sm)<div class="showing">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) Ads</div>'
         # Determine unique listing html blocks
-        Listing             = '(?sm)data-ad-id="\w+".*?<div class="details">'
+        Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
         # Get the page number out of a uri segment
         page                = 'page\-(?<pagenumber>\d+)'
     }
@@ -289,28 +289,6 @@ class KijijiSearch{
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
             $this.oldListingCutoffDate = (Get-Date).AddHours(-$OldListingThresholdHours)
             $this.flagOnlyChanges = $OnlyFlagChanges
-        } else {
-            throw [System.ArgumentException]"Failed kijiji url validation"
-        }
-
-        Write-Verbose "KijijiSearch - $($this.toString())"
-    }
-
-    KijijiSearch(
-            # Kijiji Search URL
-            [uri]$URL,
-            [int]$MaximumResults
-        ){
-        # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically halted when browsing Kijiji
-        $this._webClient.Encoding = [System.Text.Encoding]::UTF8
-        $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
-
-        # Ensure the search URL is validated and run the search.
-        if([KijijiSearch]::ValidKijijiURL($URL)){
-            $this.searchURL = $URL
-            $this.searchURLID = $this.GetSQLSearchURLID()
-            $this.maximumResultsPerSearch = $MaximumResults
-            $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
         } else {
             throw [System.ArgumentException]"Failed kijiji url validation"
         }
@@ -380,6 +358,11 @@ class KijijiSearch{
             } else {
                 Write-Verbose "Search - No listing found"
             }
+
+            # Check exit conditions
+            Write-Verbose "Search - Listings Count: $($this.listings.count )"
+            Write-Verbose "Search - Maximum Results Per Search: $($this.maximumResultsPerSearch)"
+            Write-Verbose "Search - Total Number of Search Results : $($this.totalNumberOfSearchResults)"
         } until ($this.listings.count -ge $this.maximumResultsPerSearch -or $this.totalNumberOfSearchResults -eq 0)
     }
 
