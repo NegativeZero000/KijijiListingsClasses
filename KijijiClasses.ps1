@@ -266,6 +266,7 @@ class KijijiSearch{
             [DatabaseConnectionProperties]$ConnectionParameters
         ){
         # Initialize the webclient for searching Kijiji. WebClient is used as Invoke-WebRequest has historically halted when browsing Kijiji
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $this._webClient.Encoding = [System.Text.Encoding]::UTF8
         $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
 
