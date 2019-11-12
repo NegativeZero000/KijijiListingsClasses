@@ -59,7 +59,7 @@ class KijijiListing{
         id          = '(?sm)data-listing-id="(\w+)"'
 	    url         = '(?sm)data-vip-url="(.*?)"'
 	    price       = '(?sm)<div class="price">(.*?)</div>'
-        image       = '(?sm)<div class="image">.*?<img src="(.*?)"'
+        image       = '(?sm)<div class="image">.*?<img data-src="(.*?)"'
 	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
 	    location    = '(?sm)<div class="location">(.*?)<span'
