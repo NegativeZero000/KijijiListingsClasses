@@ -1,22 +1,29 @@
 {
 	"search_config": [
 		{
-			"name": "retrovideogames",
-			"search_URLS" : [
-				"https://www.kijiji.ca/b-old-video-games/ottawa/c623l1700185r50.0?address=k2c+3p5&ll=45.344290,-75.787911"
-			],
-			"searchThreshold" : 20,
-			"newListingThreshold" : 36
-		},
-		{
 			"name": "boardgames",
 			"search_URLS" : [
 				"https://www.kijiji.ca/b-toys-games/ottawa-gatineau-area/board-games/k0c108l1700184r100.0",
+				"https://www.kijiji.ca/b-toys-games/ottawa-gatineau-area/boardgames/k0c108l1700184r100.0",
 				"https://www.kijiji.ca/b-toys-games/ottawa-gatineau-area/card-games/k0c108l1700184r100.0"
 			],
-			"searchThreshold" : 20,
-			"newListingThreshold" : 48,
-			"flagOnlyChanges": true
+			"searchThreshold" : 40,
+			"newListingThreshold" : 24,
+			"oldListingThreshold" : 1080,
+			"flagOnlyChanges": true,
+			"enabled": true
+		},
+		{
+			"name": "n64",
+			"search_URLS" : [
+				"https://www.kijiji.ca/b-video-games-consoles/ottawa/n64/k0c141l1700185r50.0?address=k4r1b4&ll=45.261431,-75.356644",
+				"https://www.kijiji.ca/b-video-games-consoles/ottawa/snes/k0c141l1700185r50.0?address=k4r1b4&ll=45.261431,-75.356644"
+			],
+			"searchThreshold" : 40,
+			"newListingThreshold" : 24,
+			"oldListingThreshold" : 1080,
+			"flagOnlyChanges": true,
+			"enabled": false
 		}
 	],
 	"db":{

@@ -55,11 +55,12 @@ class KijijiListing{
 
     static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
+    static [uri]$defaultImageURL = "https://www.shareicon.net/data/128x128/2016/08/18/810389_strategy_512x512.png"
     static $parsingRegexes = @{
         id          = '(?sm)data-listing-id="(\w+)"'
 	    url         = '(?sm)data-vip-url="(.*?)"'
 	    price       = '(?sm)<div class="price">(.*?)</div>'
-        image       = '(?sm)<div class="image">.*?<img data-src="(.*?)"'
+        image       = '(?sm)<div class="image">.*?<img.*?data-src="(.*?)"'
 	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
 	    location    = '(?sm)<div class="location">(.*?)<span'
@@ -72,14 +73,14 @@ class KijijiListing{
         $this.iD               = if($HTML -match [KijijiListing]::parsingRegexes["id"]){$matches[1]};
         $this.uRL              = if($HTML -match [KijijiListing]::parsingRegexes["url"]){$matches[1]};
         $this.price            = if($HTML -match [KijijiListing]::parsingRegexes["price"]){$matches[1].trim().trimstart('$')};
-        $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
+        $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace "`r`n?"};
         $this.distance         = if($HTML -match [KijijiListing]::parsingRegexes["distance"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.location         = if($HTML -match [KijijiListing]::parsingRegexes["location"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){
                 [KijijiListing]::ConvertFromKijijiDate([System.Web.HttpUtility]::HtmlDecode($matches[1].trim()),$Processed)
         }
         $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
-        $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]};
+        $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]}else{[KijijiListing]::defaultImageURL}
         $this.searchURLID      = $SearchUrlID
         $this.lastsearched     = $Processed 
         $this.discovered       = 0
@@ -132,9 +133,11 @@ class KijijiListing{
                     location = $this.location; posted = $this.posted; shortDescription = $this.shortDescription; 
                     imageURL = $this.imageURL; searchURLID = $this.searchURLID; lastsearched = $this.lastsearched;
                     discovered = $this.discovered; new = 1; changes=""}
-            Connectionn = $ConnectionName
+            Connection = $ConnectionName
         }
         Write-Verbose "AddtoDB - $($this.id): insert into database"
+        Write-Verbose "AddtoDB - $($InvokeSQLUpdateParameters.Query)"
+        $InvokeSQLUpdateParameters.Parameters.GetEnumerator() | ForEach-Object{Write-Verbose "AddtoDB - $($_.Name): '$($_.Value)'"}
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 
@@ -189,10 +192,12 @@ class KijijiListing{
                     location = $this.location; posted = $this.posted; shortDescription = $this.shortDescription; 
                     imageURL = $this.imageURL; searchURLID = $this.searchURLID; lastsearched = $this.lastsearched;
                     discovered = $Discovered + 1; new = 1; changes=$this.changes}
-            Connectionn = $ConnectionName
+            Connection = $ConnectionName
         }
 
-        Write-Verbose "$($this.id): updating in database"
+        Write-Verbose "UpdateInDB - $($this.id): updating in database"
+        Write-Verbose "UpdateInDB - $($InvokeSQLUpdateParameters.Query)"
+        $InvokeSQLUpdateParameters.Parameters.GetEnumerator() | ForEach-Object{Write-Verbose "UpdateInDB - $($_.Name): '$($_.Value)'"}
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 

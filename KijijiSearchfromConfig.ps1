@@ -1,36 +1,63 @@
-﻿# Import the classes into scope
+﻿[cmdletbinding()]
+param(
+    # Path where json config files are stored.
+    [Alias("Path")]
+    [string]$ConfigPath
+)
+
+# Enum to help give better information about exit code. 
+Enum ExitCode{
+    CantFindConfigFile = 10
+    CantReadConfigFile = 11 
+}
+
+
+# Import the classes into scope
 Add-Type -AssemblyName System.Web
 
-. M:\code\KijijiListingsClasses\KijijiClasses.ps1
+. "$PSScriptRoot\KijijiClasses.ps1"
 
-$previousVerbosePreference = $VerbosePreference
-$VerbosePreference = [System.Management.Automation.ActionPreference]::Continue
+if($Verbose.IsPresent){
+    $previousVerbosePreference = $VerbosePreference
+    $VerbosePreference = [System.Management.Automation.ActionPreference]::Continue
+}
 
 # Import the search alert monitor configs
-$ConfigsPath = "D:\task"
-$searchConfigFiles = Get-ChildItem $ConfigsPath -filter "*.cfg.json"
+if(Test-Path $ConfigPath -PathType Leaf){
+    try{
+        $searchConfig = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
+    } catch {
+        exit [ExitCode]::CantReadConfigFile
+    }
+} else {
+    # throw [System.ArgumentException]"Could not find file."
+    exit [ExitCode]::CantFindConfigFile
+}
 
-foreach($searchConfigFile in $searchConfigFiles){ 
-    $searchConfig = $searchConfigFile | Get-Content -raw | ConvertFrom-Json
+# Rebuild the database credentials from file
+$databaseCredentials = [System.Management.Automation.PSCredential]::new($searchConfig.db.username, ($searchConfig.db.password | ConvertTo-SecureString))
 
-    # Rebuild the credentials from file
-    $databaseCredentials = [System.Management.Automation.PSCredential]::new($searchConfig.db.username, ($searchConfig.db.password | ConvertTo-SecureString))
+# Initiate the database connection object
+$connection = [DatabaseConnectionProperties]::new($searchConfig.db.server,$searchConfig.db.port,$searchConfig.db.name,$databaseCredentials)
 
-    # Initiate the search object
-    $connection = [DatabaseConnectionProperties]::new($searchConfig.db.server,$searchConfig.db.port,$searchConfig.db.name,$databaseCredentials)
-
-    # Loop the searches in this file
-    for($searchIndex = 0; $searchIndex -lt $searchConfig.searchURLS.Count; $searchIndex++){
-        # Build the search object
-        $kijijiSearch = [KijijiSearch]::new($searchConfig.searchURLS[$searchIndex], $searchConfig.searchThreshold, $searchConfig.newListingThreshold, $searchConfig.flagOnlyChanges, $connection)
-        # Start the search based on config options
-        $kijijiSearch.Search()
-        # Load any new listings and update existing ones where applicable
-        $kijijiSearch.UpdateSQLListings()
-        # Close the search object.
-        $kijijiSearch.Completed()
+# Cycle each individual search configuration located in this file
+foreach($search in $searchConfig.search_config){
+    if($search.enabled){ 
+        # Loop the search urls in this configuration
+        foreach($searchURL in $search.search_URLS){
+            # Build the search object
+            $kijijiSearch = [KijijiSearch]::new($searchURL, $search.searchThreshold, $search.newListingThreshold, $search.oldListingThreshold, $search.flagOnlyChanges, $connection)
+            # Start the search based on config options
+            $kijijiSearch.Search()
+            # Load any new listings and update existing ones where applicable
+            $kijijiSearch.UpdateSQLListings()
+            # Close the search object.
+            $kijijiSearch.Completed()
+        }
     }
 }
 
 # Reset verbosity preference
-$VerbosePreference = $previousVerbosePreference
+if($Verbose.IsPresent){
+    $VerbosePreference = $previousVerbosePreference
+}
