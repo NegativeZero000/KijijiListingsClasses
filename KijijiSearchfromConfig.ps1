@@ -1,6 +1,7 @@
 ﻿[cmdletbinding()]
 param(
     # Path where json config files are stored.
+    [Parameter(Mandatory=$true)]
     [Alias("Path")]
     [string]$ConfigPath
 )
