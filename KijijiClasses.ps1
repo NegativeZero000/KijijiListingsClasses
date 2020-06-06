@@ -63,7 +63,7 @@ class KijijiListing{
         image       = '(?sm)<div class="image">.*?<img.*?data-src="(.*?)"'
 	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
-	    location    = '(?sm)<div class="location">.*?<span class="">(.*?)<span'
+	    location    = '(?sm)<div class="location">.*?<span class="">(.*?)</span'
 	    postedTime  = '<span class="date-posted">(.*?)</span>'
 	    description = '(?sm)<div class="description">(.*?)<div class="details">'
     }
