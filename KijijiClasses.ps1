@@ -63,7 +63,7 @@ class KijijiListing{
         image       = '(?sm)<div class="image">.*?<img.*?data-src="(.*?)"'
 	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
-	    location    = '(?sm)<div class="location">(.*?)<span'
+	    location    = '(?sm)<div class="location">.*?<span class="">(.*?)<span'
 	    postedTime  = '<span class="date-posted">(.*?)</span>'
 	    description = '(?sm)<div class="description">(.*?)<div class="details">'
     }
@@ -76,6 +76,7 @@ class KijijiListing{
         $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace "`r`n?"};
         $this.distance         = if($HTML -match [KijijiListing]::parsingRegexes["distance"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.location         = if($HTML -match [KijijiListing]::parsingRegexes["location"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
+        if([string]::IsNullOrWhiteSpace($this.location)){$this.location ="Unknown"}
         $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){
                 [KijijiListing]::ConvertFromKijijiDate([System.Web.HttpUtility]::HtmlDecode($matches[1].trim()),$Processed)
         }
@@ -225,6 +226,7 @@ class KijijiListing{
                 try{
                     return [DateTime]::ParseExact($DateString, [KijijiListing]::kijijiDateFormat, $null) 
                 } catch {
+                    # There might not be any date actually posted. 
                     return $null
                 }
             }
