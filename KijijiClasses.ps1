@@ -44,7 +44,7 @@ class KijijiListing{
     [string]$title
     [string]$distance
     [string]$location
-    [datetime]$posted
+    [nullable[datetime]]$posted
     [string]$shortdescription
     [datetime]$lastsearched
     [int]$searchURLID
@@ -59,7 +59,7 @@ class KijijiListing{
     static $parsingRegexes = @{
         id          = '(?sm)data-listing-id="(\w+)"'
 	    url         = '(?sm)data-vip-url="(.*?)"'
-	    price       = '(?sm)<div class="price">(.*?)</div>'
+	    price       = '(?sm)<div class="price">(.*?)</?div'
         image       = '(?sm)<div class="image">.*?<img.*?data-src="(.*?)"'
 	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
@@ -139,6 +139,7 @@ class KijijiListing{
         Write-Verbose "AddtoDB - $($this.id): insert into database"
         Write-Verbose "AddtoDB - $($InvokeSQLUpdateParameters.Query)"
         $InvokeSQLUpdateParameters.Parameters.GetEnumerator() | ForEach-Object{Write-Verbose "AddtoDB - $($_.Name): '$($_.Value)'"}
+
         return (Invoke-SqlUpdate @InvokeSQLUpdateParameters)
     }
 
@@ -251,6 +252,7 @@ class KijijiSearch{
     [datetime]$newListingCutoffDate
     [datetime]$oldListingCutoffDate
     [bool]$flagOnlyChanges = $false
+    [bool]$ignoreNullDates = $false
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
         # Current listing index as well as total results. Helps determine number of pages.
@@ -268,6 +270,7 @@ class KijijiSearch{
             [int]$MaximumResults,
             [int]$NewListingThresholdHours=36,
             [int]$OldListingThresholdHours=1080,
+            [bool]$ignoreNullDates,
             [bool]$OnlyFlagChanges,
             # Database connection parameters
             [DatabaseConnectionProperties]$ConnectionParameters
@@ -298,6 +301,7 @@ class KijijiSearch{
             $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
             $this.oldListingCutoffDate = (Get-Date).AddHours(-$OldListingThresholdHours)
             $this.flagOnlyChanges = $OnlyFlagChanges
+            $this.ignoreNullDates = $ignoreNullDates
         } else {
             throw [System.ArgumentException]"Failed kijiji url validation"
         }
@@ -376,7 +380,7 @@ class KijijiSearch{
     }
 
     UpdateSQLListings(){
-        # Load the currentl listings into the database. New ones will be added outright. If there are conflicts outside a date thresholds then
+        # Load the current listings into the database. New ones will be added outright. If there are conflicts outside a date thresholds then
         # updates to current data may be done.
         
         foreach($listing in $this.listings){
@@ -427,8 +431,10 @@ class KijijiSearch{
                     Write-Verbose "UpdateSQLListings - Listing $($listing.id) found in database before the newListingCutoffDate. No changes made"
                 }
             } else {
-                # This ID is not located in the database. Add It
-                $listing.AddtoDB($this._databaseConnectionName)
+                # This ID is not located in the database. Add It unless it has a null date and those were to be ignored. 
+                if($listing.posted -or -not $this.ignoreNullDates){
+                    $listing.AddtoDB($this._databaseConnectionName)
+                }
             }
         }
     }
