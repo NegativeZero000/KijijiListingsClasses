@@ -64,7 +64,7 @@ class KijijiListing{
 	    title       = '(?sm)data-testid="listing-link"\s+?href=".*?" class=".*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
 	    location    = '(?sm)data-testid="listing-location" class=".*?">(.*?)</p>'
-	    postedTime  = 'data-testid="listing-date" class=".*?">(.*?)</p>'
+	    postedTime  = '(?sm)data-testid="listing-date" class=".*?">(.*?)</p>'
 	    description = '(?sm)<p data-testid="listing-description" class=".*?">(.*?)</p>'
     }
 
