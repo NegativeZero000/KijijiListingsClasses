@@ -57,15 +57,15 @@ class KijijiListing{
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static [uri]$defaultImageURL = "https://www.shareicon.net/data/128x128/2016/08/18/810389_strategy_512x512.png"
     static $parsingRegexes = @{
-        id          = '(?sm)data-listing-id="(\w+)"'
-	    url         = '(?sm)data-vip-url="(.*?)"'
-	    price       = '(?sm)<div class="price">(.*?)</?div'
-        image       = '(?sm)<div class="image">.*?<img.*?data-src="(.*?)"'
-	    title       = '(?sm)<div class="title">.*?">(.*?)</a>'
+        id          = '(?sm)data-testid="listing-link"\s+?href=".*?\/(\d{9}\d+)'
+        url         = '(?sm)data-testid="listing-link"\s+?href="(.*?)"'
+	    price       = '(?sm)data-testid="listing-price"\s+?class=".*?">(.*?)</p>'
+        image       = '(?sm)data-testid="listing-card-image"\s+?src="(https.*?)"'
+	    title       = '(?sm)data-testid="listing-link"\s+?href=".*?" class=".*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
-	    location    = '(?sm)<div class="location">.*?<span class="">(.*?)</span'
-	    postedTime  = '<span class="date-posted">(.*?)</span>'
-	    description = '(?sm)<div class="description">(.*?)<div class="details">'
+	    location    = '(?sm)data-testid="listing-location" class=".*?">(.*?)</p>'
+	    postedTime  = 'data-testid="listing-date" class=".*?">(.*?)</p>'
+	    description = '(?sm)<p data-testid="listing-description" class=".*?">(.*?)</p>'
     }
 
     KijijiListing([string]$HTML,[int]$SearchUrlID,[datetime]$Processed){
@@ -256,9 +256,10 @@ class KijijiSearch{
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
         # Current listing index as well as total results. Helps determine number of pages.
-        TotalListingNumbers = '(?sm)<div class="showing">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) Ads</div>'
+        TotalListingNumbers = '(?sm)<span class=".*?">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) results</span>'
         # Determine unique listing html blocks
-        Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
+        # Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
+        Listing             = '(?sm)<li data-testid="listing-card-list-item-\d+">.*?</li>'
         # Get the page number out of a uri segment
         page                = 'page\-(?<pagenumber>\d+)'
     }
@@ -279,7 +280,7 @@ class KijijiSearch{
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $this._webClient.Encoding = [System.Text.Encoding]::UTF8
         $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
-        $this._webClient.Headers.Add("user-agent","Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.129 Safari/537.36")
+        $this._webClient.Headers.Add("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
 
         # Initialize the database connection
         try{
