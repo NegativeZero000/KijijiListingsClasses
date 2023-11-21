@@ -280,7 +280,7 @@ class KijijiSearch{
         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $this._webClient.Encoding = [System.Text.Encoding]::UTF8
         $this._webClient.CachePolicy = [System.Net.Cache.RequestCachePolicy]::new([System.Net.Cache.RequestCacheLevel]::NoCacheNoStore)
-        $this._webClient.Headers.Add("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36")
+        $this._webClient.Headers.Add("user-agent","Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36")
 
         # Initialize the database connection
         try{
@@ -434,7 +434,11 @@ class KijijiSearch{
             } else {
                 # This ID is not located in the database. Add It unless it has a null date and those were to be ignored. 
                 if($listing.posted -or -not $this.ignoreNullDates){
+                    Write-Verbose "UpdateSQLListings - Adding listing with ID $($listing.id) to database"
                     $listing.AddtoDB($this._databaseConnectionName)
+                } else {
+                    if(-not $listing.posted){Write-Verbose "UpdateSQLListings - Skip adding listing with ID $($listing.id) to database. Missing posted date"}
+                    if($this.ignoreNullDates){Write-Verbose "UpdateSQLListings - Skip adding listing with ID $($listing.id) to database. Ignore Null date flag set"}
                 }
             }
         }

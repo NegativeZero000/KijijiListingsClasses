@@ -10,6 +10,7 @@
 			"searchThreshold" : 40,
 			"newListingThreshold" : 24,
 			"oldListingThreshold" : 1080,
+			"ignoreNulldates" : false,
 			"flagOnlyChanges": true,
 			"enabled": true
 		},
@@ -22,13 +23,26 @@
 			"searchThreshold" : 40,
 			"newListingThreshold" : 24,
 			"oldListingThreshold" : 1080,
+			"ignoreNulldates" : true,
 			"flagOnlyChanges": true,
 			"enabled": false
+		},
+		{
+			"name": "trike",
+			"search_URLS" : [
+				"https://www.kijiji.ca/b-bikes/ottawa/recumbent-trike/k0c644l1700185?ll=45.436109%2C-76.362547&address=3+McLachlin+St+S%2C+Arnprior%2C+ON+K7S+2Y7%2C+Canada&radius=270.0"
+			],
+			"searchThreshold" : 40,
+			"newListingThreshold" : 24,
+			"oldListingThreshold" : 720,
+			"ignoreNulldates" : false,
+			"flagOnlyChanges": true,
+			"enabled": true
 		}
 	],
 	"db":{
 		"username":"kijiji",
-		"password": "01000000d08c9ddf0115d1118c7a00c04fc297eb01000000e5530e58913e1547851baf6f14a168f1000000000200000000001066000000010000200000003a51c6638a1b88fd5fa63e4ed3a62158bd425e142c2050466d89de122cbd3318000000000e80000000020000200000001c11ceda3b72d9865378f6dc9712b900c289991f82d436b3f4b2c61e41c64b1d2000000066733af5902a8a76213b7ec2ff6a0bb0589845d9b595b3c306777e1891cbd9f7400000006552746f7d0f1e838e62e93159eefdb0ce5932e58ad57c0fc9222f78a3ce7522ef8168534dd82dcbf88e21d1f26f4a4884f8170e6de605c6a32dd25fc9d9d24a",
+		"password": "01000000d08c9ddf0115d1118c7a00c04fc297eb010000007b458de52beed443b8ae3fd4ec5a02dd000000000200000000001066000000010000200000005d35df2b11519327a9cfbc12745442dbdae136bbdadea4e5a20786da68f68374000000000e8000000002000020000000d109fe05ea0e85c3036e23d4409f773575bf7563a3c4cace8d1491353632fec320000000a381a2293314dfa07c5357cb2e8de60d60a7fb5c3ea2650538858e9de69cdb8c4000000031dd5db46bf7c0e22589a82d7585c09a9b46decc80516e458b56ba11fd87f0c952ad8961d23aaa0b8c7829ada42f30de492b0e2a1d26b97ebea0b878e6ce8cbe",
 		"name":"kijiji",
 		"port":49000
 	}
