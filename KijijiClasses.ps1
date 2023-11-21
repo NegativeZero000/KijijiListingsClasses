@@ -60,7 +60,7 @@ class KijijiListing{
         id          = '(?sm)data-testid="listing-link"\s+?href=".*?\/(\d{9}\d+)'
         url         = '(?sm)data-testid="listing-link"\s+?href="(.*?)"'
 	    price       = '(?sm)data-testid="listing-price"\s+?class=".*?">(.*?)</p>'
-        image       = '(?sm)data-testid="listing-card-image"\s+?src="(https.*?)"'
+        image       = '(?sm)data-testid="listing-card-image".*?src="(https.*?)"'
 	    title       = '(?sm)data-testid="listing-link"\s+?href=".*?" class=".*?">(.*?)</a>'
 	    distance    = '(?sm)<div class="distance">(.*?)</div>'
 	    location    = '(?sm)data-testid="listing-location" class=".*?">(.*?)</p>'
@@ -256,12 +256,13 @@ class KijijiSearch{
     $listings = [System.Collections.ArrayList]::new()
     static $parsingRegexes = @{
         # Current listing index as well as total results. Helps determine number of pages.
-        TotalListingNumbers = '(?sm)<span class=".*?">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) results</span>'
+        # TotalListingNumbers = '(?sm)<span class=".*?">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) results</span>'
+        TotalListingNumbers = 'Page (?<pagenumber>\d+) - (?<TotalNumberOfSearchResults>[\d,]+) results'
         # Determine unique listing html blocks
         # Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
         Listing             = '(?sm)<li data-testid="listing-card-list-item-\d+">.*?</li>'
         # Get the page number out of a uri segment
-        page                = 'page\-(?<pagenumber>\d+)'
+        Page                = 'Page (?<pagenumber>\d+) - '
     }
     
     # Contructors
@@ -352,8 +353,8 @@ class KijijiSearch{
 
             # Get search meta data from the first page of the search.
             if($rawHTML -match [KijijiSearch]::parsingRegexes["TotalListingNumbers"]){
-                $this.firstListingResultIndex    = $Matches["FirstListingResultIndex"] -as [int]
-                $this.lastListingResultIndex     = $Matches["LastListingResultIndex"] -as [int]
+                # $this.firstListingResultIndex    = $Matches["FirstListingResultIndex"] -as [int]
+                # $this.lastListingResultIndex     = $Matches["LastListingResultIndex"] -as [int]
                 $this.totalNumberOfSearchResults = $Matches["TotalNumberOfSearchResults"] -as [int]
             }
 
