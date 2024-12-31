@@ -276,6 +276,8 @@ class KijijiSearch{
     KijijiSearch(
             # Kijiji Search URL
             [uri]$URL,
+            [int]$NewListingThresholdHours=36,
+            [int]$OldListingThresholdHours=1080,
             [bool]$ignoreNullDates,
             [bool]$OnlyFlagChanges,
             # Database connection parameters
@@ -302,6 +304,8 @@ class KijijiSearch{
         if([KijijiSearch]::ValidKijijiURL($URL)){
             $this.searchURL = $URL
             $this.searchURLID = $this.GetSQLSearchURLID()
+            $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
+            $this.oldListingCutoffDate = (Get-Date).AddHours(-$OldListingThresholdHours)
             $this.flagOnlyChanges = $OnlyFlagChanges
             $this.ignoreNullDates = $ignoreNullDates
         } else {
