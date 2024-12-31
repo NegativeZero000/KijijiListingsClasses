@@ -73,14 +73,14 @@ class KijijiListing{
         $this.iD               = if($HTML -match [KijijiListing]::parsingRegexes["id"]){$matches[1]};
         $this.uRL              = if($HTML -match [KijijiListing]::parsingRegexes["url"]){$matches[1]};
         $this.price            = if($HTML -match [KijijiListing]::parsingRegexes["price"]){$matches[1].trim().trimstart('$')};
-        $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace "`r`n?"};
+        $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace "`r`n?" -replace '<[^>]+>'};
         $this.distance         = if($HTML -match [KijijiListing]::parsingRegexes["distance"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         $this.location         = if($HTML -match [KijijiListing]::parsingRegexes["location"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
         if([string]::IsNullOrWhiteSpace($this.location)){$this.location ="Unknown"}
         $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){
                 [KijijiListing]::ConvertFromKijijiDate([System.Web.HttpUtility]::HtmlDecode($matches[1].trim()),$Processed)
         }
-        $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
+        $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace '<[^>]+>'};
         $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]}else{[KijijiListing]::defaultImageURL}
         $this.searchURLID      = $SearchUrlID
         $this.lastsearched     = $Processed 
