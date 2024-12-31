@@ -257,12 +257,13 @@ class KijijiSearch{
     static $parsingRegexes = @{
         # Current listing index as well as total results. Helps determine number of pages.
         # TotalListingNumbers = '(?sm)<span class=".*?">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) results</span>'
-        TotalListingNumbers = 'Page (?<pagenumber>\d+) - (?<TotalNumberOfSearchResults>[\d,]+) results'
+        # Example: Results 41 - 80 of 220 or Results 0 - 0 of 0
+        TotalListingNumbers = 'Results (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+)'
         # Determine unique listing html blocks
         # Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
         Listing             = '(?sm)<li data-testid="listing-card-list-item-\d+">.*?</li>'
-        # Get the page number out of a uri segment
-        Page                = 'Page (?<pagenumber>\d+) - '
+        # Get the page number out of a uri segment. ' - Page 2'
+        Page                = '- Page (?<pagenumber>\d+)'
     }
     
     # Contructors
