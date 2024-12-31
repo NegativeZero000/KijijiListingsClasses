@@ -261,36 +261,21 @@ class KijijiSearch{
     hidden $_webClient = [System.Net.WebClient]::new()
     # Identifiable name to associate to the MariaDB Connection
     hidden $_databaseConnectionName = "Kijiji"
+    # HTML Script tag ID containing JSON data about the listings
+    hidden $_jsonScriptID = '__NEXT_DATA__'
+    # Discovered property containing listing data
+    hidden $_listingsJSONProperty = '__APOLLO_STATE__'
     [datetime]$SearchExecuted
-    # Search result meta data
-    $firstListingResultIndex    = 0
-    $lastListingResultIndex     = 0 
-    $totalNumberOfSearchResults = 0
-    $maximumResultsPerSearch    = 0
     [datetime]$newListingCutoffDate
     [datetime]$oldListingCutoffDate
     [bool]$flagOnlyChanges = $false
     [bool]$ignoreNullDates = $false
     $listings = [System.Collections.ArrayList]::new()
-    static $parsingRegexes = @{
-        # Current listing index as well as total results. Helps determine number of pages.
-        # TotalListingNumbers = '(?sm)<span class=".*?">.*?Showing (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+) results</span>'
-        # Example: Results 41 - 80 of 220 or Results 0 - 0 of 0
-        TotalListingNumbers = 'Results (?<FirstListingResultIndex>[\d,]+) - (?<LastListingResultIndex>[\d,]+) of (?<TotalNumberOfSearchResults>[\d,]+)'
-        # Determine unique listing html blocks
-        # Listing             = '(?sm)data-listing-id="\w+".*?<div class="details">'
-        Listing             = '(?sm)<li data-testid="listing-card-list-item-\d+">.*?</li>'
-        # Get the page number out of a uri segment. ' - Page 2'
-        Page                = '- Page (?<pagenumber>\d+)'
-    }
     
     # Contructors
     KijijiSearch(
             # Kijiji Search URL
             [uri]$URL,
-            [int]$MaximumResults,
-            [int]$NewListingThresholdHours=36,
-            [int]$OldListingThresholdHours=1080,
             [bool]$ignoreNullDates,
             [bool]$OnlyFlagChanges,
             # Database connection parameters
@@ -317,10 +302,6 @@ class KijijiSearch{
         if([KijijiSearch]::ValidKijijiURL($URL)){
             $this.searchURL = $URL
             $this.searchURLID = $this.GetSQLSearchURLID()
-            $this.maximumResultsPerSearch = $MaximumResults
-            $this.searchURL = [KijijiSearch]::_AddPageNumber($this.searchURL)
-            $this.newListingCutoffDate = (Get-Date).AddHours(-$NewListingThresholdHours)
-            $this.oldListingCutoffDate = (Get-Date).AddHours(-$OldListingThresholdHours)
             $this.flagOnlyChanges = $OnlyFlagChanges
             $this.ignoreNullDates = $ignoreNullDates
         } else {
@@ -370,27 +351,36 @@ class KijijiSearch{
             Write-Verbose "Search - Performing search against $($this.searchURL)"
             $rawHTML = $this._webClient.DownloadString($this.searchURL)
 
-            # Get search meta data from the first page of the search.
-            if($rawHTML -match [KijijiSearch]::parsingRegexes["TotalListingNumbers"]){
-                # $this.firstListingResultIndex    = $Matches["FirstListingResultIndex"] -as [int]
-                # $this.lastListingResultIndex     = $Matches["LastListingResultIndex"] -as [int]
-                $this.totalNumberOfSearchResults = $Matches["TotalNumberOfSearchResults"] -as [int]
-            }
+            # Dive into an HTML object of the HTML gathered. 
+            $HTML = New-Object -Com "HTMLFile"
+            $HTML.write([System.Text.Encoding]::Unicode.GetBytes($rawHTML))
 
-            # Parse any listings into class objects
-            if($this.totalNumberOfSearchResults -gt 0){
-                Write-Verbose "Search - Found $($this.totalNumberOfSearchResults) listing(s)"
-                $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
-                ForEach($singleListingHTML in $listingsHTML){
-                    $this.listings.add([KijijiListing]::new($singleListingHTML, $this.searchURLID, $this.SearchExecuted))
-                }
-
-                # Increase the page count for the next search, if any
-                if ($this.lastListingResultIndex -lt $this.totalNumberOfSearchResults){
-                    $this.searchURL = [KijijiSearch]::_IncreasePageNumber($this.searchURL)
+            $kijijiJSONData = $HTML.documentElement.getElementsByTagName('script') | Where {$_.id -eq $this._jsonScriptID} | Select-Object -ExpandProperty Text | ConvertFrom-Json
+            if($kijijiJSONData){
+                # The data was successfully found. Located standard listsing(s) within the object
+                # Pull any properties from the relvant section of the object with listing in its property name e.g. "StandardListing:1506576268"
+                $foundlistings = @(($kijijiJSONData.props.pageProps."$($this._listingsJSONProperty)".psobject.Properties | where name -like "*listing*").name)
+                if($foundlistings.count -gt 0){
+                    Write-Verbose "Search - Found $($foundlistings.count) listing(s)"
+                    ForEach($singleListing in $foundlistings){
+                        $this.listings.add([KijijiListing]::new($singleListing, $this.searchURLID, $this.SearchExecuted))
+                    }
+                } else {
+                    Write-Verbose "Search - No listings found in listing data."
                 }
             } else {
-                Write-Verbose "Search - No listing found"
+                # Silently fail
+                Write-Verbose "Search - No listing data found. Could not located '$($this._jsonScriptID)'"
+            }
+            
+            
+            # Parse any listings into class objects
+            if($this.totalNumberOfSearchResults -gt 0){
+                
+                $listingsHTML = [regex]::Matches($rawHTML,[KijijiSearch]::parsingRegexes["Listing"]).Value
+
+            } else {
+                
             }
 
             # Check exit conditions
