@@ -87,6 +87,24 @@ class KijijiListing{
         $this.discovered       = 0
     }
 
+    KijijiListing([object]$listingObject,[int]$SearchUrlID,[datetime]$Processed){
+        # Use the raw html of a listing and parse out the present properties. 
+        $this.iD               = $listingObject.id
+        $this.uRL              = $listingObject.url
+        $this.price            = $listingObject.price.amount / 100
+        $this.title            = $listingObject.title
+        $this.distance         = $listingObject.location.distance
+        $this.location         = $listingObject.location.name, $listingObject.location.address -join " - "
+        if([string]::IsNullOrWhiteSpace($this.location)){$this.location ="Unknown"}
+        $this.posted           = $listingObject.sortingDate
+        $this.shortDescription = $listingObject.description
+        $this.imageURL         = $listingObject.imageUrls | Select -First 1
+        $this.searchURLID      = $SearchUrlID
+        $this.lastsearched     = $Processed 
+        $this.discovered       = 0
+    }
+
+
     KijijiListing([int]$ID,[string]$ConnectionName){
         # Populate from an id in the database
         $selectIDQuery = "SELECT * FROM listings WHERE id=@id LIMIT 1"
