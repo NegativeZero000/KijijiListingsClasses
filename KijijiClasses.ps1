@@ -56,42 +56,12 @@ class KijijiListing{
     static [string[]]$ComparePropertiesToIgnore = "lastsearched","posted","discovered","searchURLID","changes"
     static [string]$kijijiDateFormat = "dd/MM/yyyy" # Date time format template
     static [uri]$defaultImageURL = "https://www.shareicon.net/data/128x128/2016/08/18/810389_strategy_512x512.png"
-    static $parsingRegexes = @{
-        id          = '(?sm)data-testid="listing-link"\s+?href=".*?\/(\d{9}\d+)'
-        url         = '(?sm)data-testid="listing-link"\s+?href="(.*?)"'
-	    price       = '(?sm)data-testid="listing-price"\s+?class=".*?">(.*?)</p>'
-        image       = '(?sm)data-testid="listing-card-image".*?src="(https.*?)"'
-	    title       = '(?sm)data-testid="listing-link"\s+?href=".*?" class=".*?">(.*?)</a>'
-	    distance    = '(?sm)<div class="distance">(.*?)</div>'
-	    location    = '(?sm)data-testid="listing-location" class=".*?">(.*?)</p>'
-	    postedTime  = '(?sm)data-testid="listing-date" class=".*?">(.*?)</p>'
-	    description = '(?sm)<p data-testid="listing-description" class=".*?">(.*?)</p>'
-    }
-
-    KijijiListing([string]$HTML,[int]$SearchUrlID,[datetime]$Processed){
-        # Use the raw html of a listing and parse out the present properties. 
-        $this.iD               = if($HTML -match [KijijiListing]::parsingRegexes["id"]){$matches[1]};
-        $this.uRL              = if($HTML -match [KijijiListing]::parsingRegexes["url"]){$matches[1]};
-        $this.price            = if($HTML -match [KijijiListing]::parsingRegexes["price"]){$matches[1].trim().trimstart('$')};
-        $this.title            = if($HTML -match [KijijiListing]::parsingRegexes["title"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace "`r`n?" -replace '<[^>]+>'};
-        $this.distance         = if($HTML -match [KijijiListing]::parsingRegexes["distance"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
-        $this.location         = if($HTML -match [KijijiListing]::parsingRegexes["location"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim())};
-        if([string]::IsNullOrWhiteSpace($this.location)){$this.location ="Unknown"}
-        $this.posted           = if($HTML -match [KijijiListing]::parsingRegexes["postedTime"]){
-                [KijijiListing]::ConvertFromKijijiDate([System.Web.HttpUtility]::HtmlDecode($matches[1].trim()),$Processed)
-        }
-        $this.shortDescription = if($HTML -match [KijijiListing]::parsingRegexes["description"]){[System.Web.HttpUtility]::HtmlDecode($matches[1].trim()) -replace '<[^>]+>'};
-        $this.imageURL         = if($HTML -match [KijijiListing]::parsingRegexes["image"]){$matches[1]}else{[KijijiListing]::defaultImageURL}
-        $this.searchURLID      = $SearchUrlID
-        $this.lastsearched     = $Processed 
-        $this.discovered       = 0
-    }
 
     KijijiListing([object]$listingObject,[int]$SearchUrlID,[datetime]$Processed){
         # Use the raw html of a listing and parse out the present properties. 
         $this.iD               = $listingObject.id
         $this.uRL              = $listingObject.url
-        $this.price            = $listingObject.price.amount / 100
+        $this.price            = '{0:N2}' -f ($listingObject.price.amount / 100)
         $this.title            = $listingObject.title
         $this.distance         = $listingObject.location.distance
         $this.location         = $listingObject.location.name, $listingObject.location.address -join " - "
@@ -367,7 +337,7 @@ class KijijiSearch{
                 if($foundlistings.count -gt 0){
                     Write-Verbose "Search - Found $($foundlistings.count) listing(s)"
                     ForEach($singleListing in $foundlistings){
-                        $this.listings.add([KijijiListing]::new($singleListing, $this.searchURLID, $this.SearchExecuted))
+                        $this.listings.add([KijijiListing]::new($kijijiJSONData.props.pageProps."$($this._listingsJSONProperty)".$singleListing, $this.searchURLID, $this.SearchExecuted))
                     }
                 } else {
                     Write-Verbose "Search - No listings found in listing data."
