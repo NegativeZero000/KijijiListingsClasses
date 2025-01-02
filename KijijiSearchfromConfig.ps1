@@ -47,7 +47,7 @@ foreach($search in $searchConfig.search_config){
         # Loop the search urls in this configuration
         foreach($searchURL in $search.search_URLS){
             # Build the search object
-            $kijijiSearch = [KijijiSearch]::new($searchURL, $search.searchThreshold, $search.newListingThreshold, $search.oldListingThreshold, $search.ignoreNullDates, $search.flagOnlyChanges, $connection)
+            $kijijiSearch = [KijijiSearch]::new($searchURL, $search.newListingThreshold, $search.oldListingThreshold, $search.ignoreNullDates, $search.flagOnlyChanges, $connection)
             # Start the search based on config options
             $kijijiSearch.Search()
             # Load any new listings and update existing ones where applicable
